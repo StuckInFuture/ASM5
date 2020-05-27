@@ -5,6 +5,7 @@
 .data
 
 file_path db 126 dup(0)
+length dw 0
 
 cmd_string db 126 dup(0)
 
@@ -46,22 +47,25 @@ parse_cmd proc
 	xor cx, cx
 	mov cl, es:[0080h]
 	mov ax, @data
-	mov es, ax 
+	mov es, ax  
+	push ds
+	mov ds, ax
 	cmp cl, 7
 	ja go_next_parse_cmd 
 	
 	output_string short_cmd 	
 	jmp end_of_programm
 	
-	go_next_parse_cmd:
+	go_next_parse_cmd:  
+	pop ds
 	;inc cl
 	mov di, offset cmd_string
 	mov si, 81h
-	push ax
-	push es
+	;push ax
+	;push es
 	push di
-	mov ax, ds
-	mov es, ax
+	;mov ax, ds
+	;mov es, ax
 	mov di, si
 	mov al, ' '
 	repz scasb
@@ -70,10 +74,10 @@ parse_cmd proc
 	inc cx
 	mov si,di 
 	pop di
-	pop es
+	;pop es
 	rep movsb
 	dec cx
-	pop ax
+	;pop ax
 	 
 	mov ax, @data
 	mov ds, ax
@@ -112,15 +116,32 @@ parse_cmd proc
     check_end_cmd:
 	    cmp cmd_string[di], byte ptr 0dh
 	    jne too_many_args 
-	    jmp end_parse_cmd
-
+	    call check_file_path_length	
+	    cmp length, 0
+	    jne end_parse_cmd
+	    output_string short_cmd
+	    jmp end_of_programm    
 	    too_many_args:
 		output_string too_many_args_str
 		jmp end_of_programm
 		
 	end_parse_cmd:
 	ret
-parse_cmd endp
+parse_cmd endp   
+
+check_file_path_length	proc
+    pusha   
+    mov si, 0
+    cycle1:
+    cmp file_path[si], 00h
+    je  end_of_check 
+    inc si
+    jmp cycle1   
+    end_of_check:  
+    mov length, si  
+    popa
+    ret
+    endp
 
 read_symbol proc
     mov ah, 3Fh
