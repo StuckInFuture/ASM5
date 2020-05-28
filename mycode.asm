@@ -289,10 +289,8 @@ start:
    call close_file
    call delete_file
    call create_open_file
-   cmp answer, 00000000h
-   je call_close_file
-   cycle_output: 
-        cmp answer, 00000000h
+   
+   cycle_output:
         call output_symbol
         dec answer
         cmp answer, 00000000h
