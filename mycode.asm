@@ -15,6 +15,10 @@ symbol db 0
 
 answer dd 0
 
+was_sign db 0 
+
+was_newl db 0
+
 file_open_error_str db "Can't open input file", 10, 13, "$"
 file_close_error_str db "Can't close input file", 10, 13, "$"
 short_cmd db "Not enough arguments.", 10, 13, "$"
@@ -179,21 +183,6 @@ output_symbol proc
     ret
 endp
 
-    
-end_of_line proc
-   call cheking_symbol
-   mov is_find_any_symbol, 0  
-   ret
-endp    
-
-cheking_symbol proc
-    cmp is_find_any_symbol, 0
-    jne end_of_checking_symbol     
-    inc answer    
-    end_of_checking_symbol:
-    ret
-endp
-
 open_file proc 
     pusha
     
@@ -253,44 +242,87 @@ delete_file proc
     end_delete_file:
     popa
     ret
+endp   
+
+end_of_line proc
+   call cheking_symbol
+   mov is_find_any_symbol, 0  
+   ret
+endp 
+
+cheking_symbol proc
+    cmp is_find_any_symbol, 1
+    jne not_empty 
+    cmp was_newl, 1
+    jne end_of_checking_symbol    
+    inc answer
+    jmp end_of_checking_symbol
+    not_empty:
+    mov was_newl, 0   
+    end_of_checking_symbol:
+    ret
 endp
-
-
 
 start:
     call parse_cmd 
-    call open_file
-   
-    mov di, 0
+    call open_file   
+    mov di, 0   
+    call read_symbol
+    cmp symbol, 0Dh
+    jne isLF 
+    inc answer
+    isLF:
+    cmp symbol, 0Ah  
+    jne iffirst
+    inc answer 
+    jmp iffirst
     
    cycle:
-        call read_symbol
-        cmp ax, 0
+        call read_symbol 
+   iffirst:     
+        cmp ax, 0h                        ;OD - CR, 0A-LF               lf g
         je end_cycle
-        
-        cmp symbol, 0Ah
-        je go_next_symbol
-                
-        cmp symbol, 0Dh
-        jne another_symbol
-        
-        call end_of_line
-        jmp go_next_symbol 
-        
-        another_symbol:
-        
+                                                                ; ws 1, wn 0 fs 0
+        cmp symbol, 0Dh                   ;1)ssfCRLF 
+        jne noCR                          ;  CRLF
+        mov was_sign, 1 
         mov is_find_any_symbol, 1
+        call end_of_line 
+        mov was_newl, 1 
+        jmp go_next_symbol
+        
+        noCR: 
+        cmp symbol, 0Ah  
+        jne not_this   ;после CR нет LF
+        cmp was_sign, 1
+        je another_symbol      ;есть LF и есть inc из-за CR
+        mov is_find_any_symbol, 1     ;нет CR перед LF
+        call end_of_line  
+        mov was_newl, 1
+        jmp go_next_symbol  
+        not_this:
+        mov is_find_any_symbol, 0
+        call end_of_line
+        
+                          
+        another_symbol:
+        mov was_sign, 0 
+        ;call end_of_line
+        ;mov is_find_any_symbol, 1
         
         go_next_symbol: 
         jmp cycle
+        
     
    end_cycle: 
    
    call close_file
    call delete_file
    call create_open_file
-   
-   cycle_output:
+   cmp answer, 00000000h
+   je call_close_file
+   cycle_output: 
+        ;cmp answer, 00000000h
         call output_symbol
         dec answer
         cmp answer, 00000000h
